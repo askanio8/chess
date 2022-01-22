@@ -7,9 +7,11 @@ from figures import *
 
 
 class ChessFieldCanvas(Canvas):
-    def __init__(self, master=None, figure=None, cnf={}, **kw):
+    def __init__(self, master=None, x=None, y=None, figure=None, cnf={}, **kw):
         Canvas.__init__(self, master=None, cnf={}, **kw)
         self._figure = figure
+        self.x = x
+        self.y = y
 
     @property
     def Figure(self):
@@ -19,16 +21,23 @@ class ChessFieldCanvas(Canvas):
     def Figure(self, figure):
         if figure is None:  # фигура уходит с этой клетки
             self.delete(self.find_all()[-1])
+            if self._figure.color == 'white':
+                self._figure.board.white_figures_list.figures_map[self._figure.x, self._figure.y] = 0
+            else:
+                self._figure.board.black_figures_list.figures_map[self._figure.x, self._figure.y] = 0
             self._figure = None
         elif self._figure is None:  # эта клетка была пустая, пришла фигура
             self._figure = figure
             self._figure.field = self
             if self._figure.coords_on_img : self._figure.drawself()
         elif self._figure and figure:  # на эту клетку ставят фигуру, но на ней фигура уже есть
-            del self._figure
+            if self._figure.color == 'white':
+                self._figure.board.white_figures_list.figures_map[figure.field.x, figure.field.y] = 0
+            else:
+                self._figure.board.black_figures_list.figures_map[figure.field.x, figure.field.y] = 0
+            self.delete(self.find_all()[-1])
             self._figure = figure
             self._figure.field = self
-            self.delete(self.find_all()[-1])
             if self._figure.coords_on_img: self._figure.drawself()
         # иначе, если на клетке не было фигуры и приходит None, то ничего не делаем
 

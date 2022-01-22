@@ -11,6 +11,7 @@ class Gameboard:
     def __init__(self, window):
         self.window = window  # окно tkinter
         self.canvaslists = []  # списки клеток по рядам
+        self.history = []
         self.drawboard()  # рисуем доску
         self.white_figures_list = FiguresList()
         self.black_figures_list = FiguresList()
@@ -22,7 +23,7 @@ class Gameboard:
         for r in range(8):
             rowlist = []
             for c in range(8):
-                canvas = ChessFieldCanvas(self.window, width=80, height=80, background='#eeeed2',
+                canvas = ChessFieldCanvas(self.window, width=80, x=r, y=c, height=80, background='#eeeed2',
                                           bd=0, highlightthickness=0)
                 if (r + c) % 2 == 0:
                     canvas.configure(bg='lightgray')

@@ -13,36 +13,29 @@ class Figure:
         self.template_movements = np.zeros((15, 15), dtype=int)
         self.coords_on_img = None
         self.field = None
-        self.x = None
-        self.y = None
-        self.move(field)
+        self.to_field(field)
 
     def move(self, field):
-        num_canvas = 0 if len(str(field)[18:]) == 0 else int(str(field)[18:]) - 1
-        if self.available_movements[num_canvas // 8, num_canvas % 8] == 1:  # если ход возможен, то делаем его
-            self.__register_in_figure_list__(num_canvas)
-            self.board.history.append((self, (self.x, self.y), (num_canvas // 8, num_canvas % 8)))
-            self.x = num_canvas // 8
-            self.y = num_canvas % 8
-            if self.field: self.field.Figure = None  # здесь проблема гдето
-            self.field = field
-            field.Figure = self
-            self.board.calculateMovements()  # пересчитываем возможные ходы для всех фигур
+        if self.available_movements[field.x, field.y] == 1:  # если ход возможен, то делаем его
+            self.board.history.append((self, (self.field.x, self.field.y), (field.x, field.y)))
+            self.field.Figure = None
+            self.to_field(field)
+        self.board.calculateMovements()
 
-    def __register_in_figure_list__(self, num_canvas):
+    def to_field(self, field):
+        self.field = field
+        self.field.Figure = self
         if self.color == 'white':
-            self.board.white_figures_list.figures_map[num_canvas // 8, num_canvas % 8] = 1
-            if self.field: self.board.white_figures_list.figures_map[self.x, self.y] = 0
+            self.board.white_figures_list.figures_map[self.field.x, self.field.y] = 1
         else:
-            self.board.black_figures_list.figures_map[num_canvas // 8, num_canvas % 8] = 1
-            if self.field: self.board.black_figures_list.figures_map[self.x, self.y] = 0
+            self.board.black_figures_list.figures_map[self.field.x, self.field.y] = 1
 
     def drawself(self):
         a = self.field.create_image((self.coords_on_img[0], self.coords_on_img[1]), image=self.img)
 
     def check_movements(self):
-        self.available_movements = self.template_movements[abs(7 - self.x):abs(7 - self.x) + 8,
-                                   abs(7 - self.y):abs(7 - self.y) + 8].copy()
+        self.available_movements = self.template_movements[abs(7 - self.field.x):abs(7 - self.field.x) + 8,
+                                   abs(7 - self.field.y):abs(7 - self.field.y) + 8].copy()
         if self.color == 'white':
             self.available_movements -= np.logical_and(self.available_movements,
                                                        self.board.white_figures_list.figures_map)
@@ -78,12 +71,28 @@ class Pawn(Figure):
         self.drawself()
 
     def move(self, field):
-        num_canvas = 0 if len(str(field)[18:]) == 0 else int(str(field)[18:]) - 1
-        if self.y and num_canvas % 8 != self.y and field.Figure == None:
-            if self.color == 'white':
-                self.board.canvaslists[num_canvas//8 + 1][num_canvas%8].Figure = None
-            else:
-                self.board.canvaslists[num_canvas//8 - 1][num_canvas%8].Figure = None
+        if self.color == 'white':
+            # убираем пешку, побитую этой на проходе
+            if self.field and field.y != self.field.y and field.Figure == None:
+                self.board.canvaslists[field.x + 1][field.y].Figure = None
+            # если ход на последнюю строку, меняем пешку на ферзя
+            if field.x == 0:
+                self.field.Figure = None
+                self.board.white_figures_list.remove(self)
+                self.board.white_figures_list.append(Queen(field, self.color, self.board))
+                del self
+                return
+        else:
+            # убираем пешку, побитую этой на проходе
+            if self.field and field.y != self.field.y and field.Figure == None:
+                self.board.canvaslists[field.x - 1][field.y].Figure = None
+            # если ход на последнюю строку, меняем пешку на ферзя
+            if field.x == 7:
+                self.field.Figure = None
+                self.board.black_figures_list.remove(self)
+                self.board.black_figures_list.append(Queen(field, self.color, self.board))
+                del self
+                return
         super().move(field)
 
     def check_movements(self):
@@ -91,47 +100,47 @@ class Pawn(Figure):
         if self.color == 'white':
             # если поле перед пешкой занято, ход запрещаем
             if np.logical_or(self.board.white_figures_list.figures_map,
-                            self.board.black_figures_list.figures_map)[self.x - 1, self.y] == 1:
-                self.available_movements[self.x - 1, self.y] = 0
-            # если поле перед пешкой свободно, пешка на начальной позиции и а два поля впереди нет фигур
+                            self.board.black_figures_list.figures_map)[self.field.x - 1, self.field.y] == 1:
+                self.available_movements[self.field.x - 1, self.field.y] = 0
+            # если поле перед пешкой свободно, пешка на начальной позиции и на два поля впереди нет фигур
             # разрешаем ход на две клетки вперед
-            elif self.x == 6 and np.logical_or(self.board.white_figures_list.figures_map,
-                            self.board.black_figures_list.figures_map)[self.x - 2, self.y] == 0:
-                self.available_movements[self.x - 2, self.y] = 1
+            elif self.field.x == 6 and np.logical_or(self.board.white_figures_list.figures_map,
+                            self.board.black_figures_list.figures_map)[self.field.x - 2, self.field.y] == 0:
+                self.available_movements[self.field.x - 2, self.field.y] = 1
             # разрешаем бить на поля по диагонали
-            if self.y < 7 and self.board.black_figures_list.figures_map[self.x - 1, self.y + 1] == 1:
-                self.available_movements[self.x - 1, self.y + 1] = 1
-            if self.y >= 0 and self.board.black_figures_list.figures_map[self.x - 1, self.y - 1] == 1:
-                self.available_movements[self.x - 1, self.y - 1] = 1
+            if self.field.y < 7 and self.board.black_figures_list.figures_map[self.field.x - 1, self.field.y + 1] == 1:
+                self.available_movements[self.field.x - 1, self.field.y + 1] = 1
+            if self.field.y > 0 and self.board.black_figures_list.figures_map[self.field.x - 1, self.field.y - 1] == 1:
+                self.available_movements[self.field.x - 1, self.field.y - 1] = 1
             # проверяем возможность боя на проходе
-            if self.x == 3 and type(self.board.history[-1][0]) == type(self) and self.board.history[-1][1][0] == 1 \
-                    and self.board.history[-1][2][0] == 3 and (self.y - self.board.history[-1][2][1]) == 1:
-                self.available_movements[self.x - 1, self.y - 1] = 1
-            if self.x == 3 and type(self.board.history[-1][0]) == type(self) and self.board.history[-1][1][0] == 1 \
-                    and self.board.history[-1][2][0] == 3 and (self.y - self.board.history[-1][2][1]) == -1:
-                self.available_movements[self.x - 1, self.y + 1] = 1
+            if self.field.x == 3 and type(self.board.history[-1][0]) == type(self) and self.board.history[-1][1][0] == 1 \
+                    and self.board.history[-1][2][0] == 3 and (self.field.y - self.board.history[-1][2][1]) == 1:
+                self.available_movements[self.field.x - 1, self.field.y - 1] = 1
+            if self.field.x == 3 and type(self.board.history[-1][0]) == type(self) and self.board.history[-1][1][0] == 1 \
+                    and self.board.history[-1][2][0] == 3 and (self.field.y - self.board.history[-1][2][1]) == -1:
+                self.available_movements[self.field.x - 1, self.field.y + 1] = 1
         elif self.color == 'black':
             # если поле перед пешкой занято, ход запрещаем
             if np.logical_or(self.board.white_figures_list.figures_map,
-                            self.board.black_figures_list.figures_map)[self.x + 1, self.y] == 1:
-                self.available_movements[self.x + 1, self.y] = 0
-            # если поле перед пешкой свободно, пешка на начальной позиции и а два поля впереди нет фигур
+                            self.board.black_figures_list.figures_map)[self.field.x + 1, self.field.y] == 1:
+                self.available_movements[self.field.x + 1, self.field.y] = 0
+            # если поле перед пешкой свободно, пешка на начальной позиции и на два поля впереди нет фигур
             # разрешаем ход на две клетки вперед
-            elif self.x == 1 and np.logical_or(self.board.white_figures_list.figures_map,
-                            self.board.black_figures_list.figures_map)[self.x + 2, self.y] == 0:
-                self.available_movements[self.x + 2, self.y] = 1
+            elif self.field.x == 1 and np.logical_or(self.board.white_figures_list.figures_map,
+                            self.board.black_figures_list.figures_map)[self.field.x + 2, self.field.y] == 0:
+                self.available_movements[self.field.x + 2, self.field.y] = 1
             # разрешаем бить на поля по диагонали
-            if self.y < 7 and self.board.white_figures_list.figures_map[self.x + 1, self.y + 1] == 1:
-                self.available_movements[self.x + 1, self.y + 1] = 1
-            if self.y >= 0 and self.board.white_figures_list.figures_map[self.x + 1, self.y - 1] == 1:
-                self.available_movements[self.x + 1, self.y - 1] = 1
+            if self.field.y < 7 and self.board.white_figures_list.figures_map[self.field.x + 1, self.field.y + 1] == 1:
+                self.available_movements[self.field.x + 1, self.field.y + 1] = 1
+            if self.field.y > 0 and self.board.white_figures_list.figures_map[self.field.x + 1, self.field.y - 1] == 1:
+                self.available_movements[self.field.x + 1, self.field.y - 1] = 1
             # проверяем возможность боя на проходе
-            if self.x == 4 and type(self.board.history[-1][0]) == type(self) and self.board.history[-1][1][0] == 6 \
-                    and self.board.history[-1][2][0] == 4 and (self.y - self.board.history[-1][2][1]) == 1:
-                self.available_movements[self.x + 1, self.y - 1] = 1
-            if self.x == 4 and type(self.board.history[-1][0]) == type(self) and self.board.history[-1][1][0] == 6 \
-                    and self.board.history[-1][2][0] == 4 and (self.y - self.board.history[-1][2][1]) == -1:
-                self.available_movements[self.x + 1, self.y + 1] = 1
+            if self.field.x == 4 and type(self.board.history[-1][0]) == type(self) and self.board.history[-1][1][0] == 6 \
+                    and self.board.history[-1][2][0] == 4 and (self.field.y - self.board.history[-1][2][1]) == 1:
+                self.available_movements[self.field.x + 1, self.field.y - 1] = 1
+            if self.field.x == 4 and type(self.board.history[-1][0]) == type(self) and self.board.history[-1][1][0] == 6 \
+                    and self.board.history[-1][2][0] == 4 and (self.field.y - self.board.history[-1][2][1]) == -1:
+                self.available_movements[self.field.x + 1, self.field.y + 1] = 1
 
 
 class Rook(Figure):
@@ -165,6 +174,48 @@ class Rook(Figure):
 
     def check_movements(self):
         super().check_movements()
+        if self.color == 'white':
+            flag = True
+            for i in range(self.field.x + 1, len(self.available_movements)):  # вниз
+                if self.board.white_figures_list.figures_map[i, self.field.y] == 1: flag = False
+                self.available_movements[i, self.field.y] = int(flag)
+                if self.board.black_figures_list.figures_map[i, self.field.y] == 1: flag = False
+            flag = True
+            for i in range(self.field.x - 1, -1, -1):  # вверх
+                if self.board.white_figures_list.figures_map[i, self.field.y] == 1: flag = False
+                self.available_movements[i, self.field.y] = int(flag)
+                if self.board.black_figures_list.figures_map[i, self.field.y] == 1: flag = False
+            flag = True
+            for i in range(self.field.y + 1, len(self.available_movements)):  # вправо
+                if self.board.white_figures_list.figures_map[self.field.x, i] == 1: flag = False
+                self.available_movements[self.field.x, i] = int(flag)
+                if self.board.black_figures_list.figures_map[self.field.x, i] == 1: flag = False
+            flag = True
+            for i in range(self.field.y - 1, -1, -1):  # влево
+                if self.board.white_figures_list.figures_map[self.field.x, i] == 1: flag = False
+                self.available_movements[self.field.x, i] = int(flag)
+                if self.board.black_figures_list.figures_map[self.field.x, i] == 1: flag = False
+        if self.color == 'black':
+            flag = True
+            for i in range(self.field.x + 1, len(self.available_movements)):  # вниз
+                if self.board.black_figures_list.figures_map[i, self.field.y] == 1: flag = False
+                self.available_movements[i, self.field.y] = int(flag)
+                if self.board.white_figures_list.figures_map[i, self.field.y] == 1: flag = False
+            flag = True
+            for i in range(self.field.x - 1, -1, -1):  # вверх
+                if self.board.black_figures_list.figures_map[i, self.field.y] == 1: flag = False
+                self.available_movements[i, self.field.y] = int(flag)
+                if self.board.white_figures_list.figures_map[i, self.field.y] == 1: flag = False
+            flag = True
+            for i in range(self.field.y + 1, len(self.available_movements)):  # вправо
+                if self.board.black_figures_list.figures_map[self.field.x, i] == 1: flag = False
+                self.available_movements[self.field.x, i] = int(flag)
+                if self.board.white_figures_list.figures_map[self.field.x, i] == 1: flag = False
+            flag = True
+            for i in range(self.field.y - 1, -1, -1):  # влево
+                if self.board.black_figures_list.figures_map[self.field.x, i] == 1: flag = False
+                self.available_movements[self.field.x, i] = int(flag)
+                if self.board.white_figures_list.figures_map[self.field.x, i] == 1: flag = False
 
 
 class Knight(Figure):
@@ -221,6 +272,48 @@ class Bishop(Figure):
 
     def check_movements(self):
         super().check_movements()
+        if self.color == 'white':
+            flag = True
+            for x, y in zip(range(self.field.x + 1, 8), range(self.field.y + 1, 8)):  # вниз вправо
+                if self.board.white_figures_list.figures_map[x, y] == 1: flag = False
+                self.available_movements[x, y] = int(flag)
+                if self.board.black_figures_list.figures_map[x, y] == 1: flag = False
+            flag = True
+            for x, y in zip(range(self.field.x + 1, 8), range(self.field.y - 1, -1, -1)):  # вниз влево
+                if self.board.white_figures_list.figures_map[x, y] == 1: flag = False
+                self.available_movements[x, y] = int(flag)
+                if self.board.black_figures_list.figures_map[x, y] == 1: flag = False
+            flag = True
+            for x, y in zip(range(self.field.x - 1, -1, -1), range(self.field.y + 1, 8)):  # вверх вправо
+                if self.board.white_figures_list.figures_map[x, y] == 1: flag = False
+                self.available_movements[x, y] = int(flag)
+                if self.board.black_figures_list.figures_map[x, y] == 1: flag = False
+            flag = True
+            for x, y in zip(range(self.field.x - 1, -1, -1), range(self.field.y - 1, -1, -1)):  # вверх влево
+                if self.board.white_figures_list.figures_map[x, y] == 1: flag = False
+                self.available_movements[x, y] = int(flag)
+                if self.board.black_figures_list.figures_map[x, y] == 1: flag = False
+        if self.color == 'black':
+            flag = True
+            for x, y in zip(range(self.field.x + 1, 8), range(self.field.y + 1, 8)):  # вниз вправо
+                if self.board.black_figures_list.figures_map[x, y] == 1: flag = False
+                self.available_movements[x, y] = int(flag)
+                if self.board.white_figures_list.figures_map[x, y] == 1: flag = False
+            flag = True
+            for x, y in zip(range(self.field.x + 1, 8), range(self.field.y - 1, -1, -1)):  # вниз влево
+                if self.board.black_figures_list.figures_map[x, y] == 1: flag = False
+                self.available_movements[x, y] = int(flag)
+                if self.board.white_figures_list.figures_map[x, y] == 1: flag = False
+            flag = True
+            for x, y in zip(range(self.field.x - 1, -1, -1), range(self.field.y + 1, 8)):  # вверх вправо
+                if self.board.black_figures_list.figures_map[x, y] == 1: flag = False
+                self.available_movements[x, y] = int(flag)
+                if self.board.white_figures_list.figures_map[x, y] == 1: flag = False
+            flag = True
+            for x, y in zip(range(self.field.x - 1, -1, -1), range(self.field.y - 1, -1, -1)):  # вверх влево
+                if self.board.black_figures_list.figures_map[x, y] == 1: flag = False
+                self.available_movements[x, y] = int(flag)
+                if self.board.white_figures_list.figures_map[x, y] == 1: flag = False
 
 
 class Queen(Figure):
@@ -249,6 +342,90 @@ class Queen(Figure):
 
     def check_movements(self):
         super().check_movements()
+        if self.color == 'white':
+            flag = True
+            for i in range(self.field.x + 1, len(self.available_movements)):  # вниз
+                if self.board.white_figures_list.figures_map[i, self.field.y] == 1: flag = False
+                self.available_movements[i, self.field.y] = int(flag)
+                if self.board.black_figures_list.figures_map[i, self.field.y] == 1: flag = False
+            flag = True
+            for i in range(self.field.x - 1, -1, -1):  # вверх
+                if self.board.white_figures_list.figures_map[i, self.field.y] == 1: flag = False
+                self.available_movements[i, self.field.y] = int(flag)
+                if self.board.black_figures_list.figures_map[i, self.field.y] == 1: flag = False
+            flag = True
+            for i in range(self.field.y + 1, len(self.available_movements)):  # вправо
+                if self.board.white_figures_list.figures_map[self.field.x, i] == 1: flag = False
+                self.available_movements[self.field.x, i] = int(flag)
+                if self.board.black_figures_list.figures_map[self.field.x, i] == 1: flag = False
+            flag = True
+            for i in range(self.field.y - 1, -1, -1):  # влево
+                if self.board.white_figures_list.figures_map[self.field.x, i] == 1: flag = False
+                self.available_movements[self.field.x, i] = int(flag)
+                if self.board.black_figures_list.figures_map[self.field.x, i] == 1: flag = False
+        if self.color == 'black':
+            flag = True
+            for i in range(self.field.x + 1, len(self.available_movements)):  # вниз
+                if self.board.black_figures_list.figures_map[i, self.field.y] == 1: flag = False
+                self.available_movements[i, self.field.y] = int(flag)
+                if self.board.white_figures_list.figures_map[i, self.field.y] == 1: flag = False
+            flag = True
+            for i in range(self.field.x - 1, -1, -1):  # вверх
+                if self.board.black_figures_list.figures_map[i, self.field.y] == 1: flag = False
+                self.available_movements[i, self.field.y] = int(flag)
+                if self.board.white_figures_list.figures_map[i, self.field.y] == 1: flag = False
+            flag = True
+            for i in range(self.field.y + 1, len(self.available_movements)):  # вправо
+                if self.board.black_figures_list.figures_map[self.field.x, i] == 1: flag = False
+                self.available_movements[self.field.x, i] = int(flag)
+                if self.board.white_figures_list.figures_map[self.field.x, i] == 1: flag = False
+            flag = True
+            for i in range(self.field.y - 1, -1, -1):  # влево
+                if self.board.black_figures_list.figures_map[self.field.x, i] == 1: flag = False
+                self.available_movements[self.field.x, i] = int(flag)
+                if self.board.white_figures_list.figures_map[self.field.x, i] == 1: flag = False
+        if self.color == 'white':
+            flag = True
+            for x, y in zip(range(self.field.x + 1, 8), range(self.field.y + 1, 8)):  # вниз вправо
+                if self.board.white_figures_list.figures_map[x, y] == 1: flag = False
+                self.available_movements[x, y] = int(flag)
+                if self.board.black_figures_list.figures_map[x, y] == 1: flag = False
+            flag = True
+            for x, y in zip(range(self.field.x + 1, 8), range(self.field.y - 1, -1, -1)):  # вниз влево
+                if self.board.white_figures_list.figures_map[x, y] == 1: flag = False
+                self.available_movements[x, y] = int(flag)
+                if self.board.black_figures_list.figures_map[x, y] == 1: flag = False
+            flag = True
+            for x, y in zip(range(self.field.x - 1, -1, -1), range(self.field.y + 1, 8)):  # вверх вправо
+                if self.board.white_figures_list.figures_map[x, y] == 1: flag = False
+                self.available_movements[x, y] = int(flag)
+                if self.board.black_figures_list.figures_map[x, y] == 1: flag = False
+            flag = True
+            for x, y in zip(range(self.field.x - 1, -1, -1), range(self.field.y - 1, -1, -1)):  # вверх влево
+                if self.board.white_figures_list.figures_map[x, y] == 1: flag = False
+                self.available_movements[x, y] = int(flag)
+                if self.board.black_figures_list.figures_map[x, y] == 1: flag = False
+        if self.color == 'black':
+            flag = True
+            for x, y in zip(range(self.field.x + 1, 8), range(self.field.y + 1, 8)):  # вниз вправо
+                if self.board.black_figures_list.figures_map[x, y] == 1: flag = False
+                self.available_movements[x, y] = int(flag)
+                if self.board.white_figures_list.figures_map[x, y] == 1: flag = False
+            flag = True
+            for x, y in zip(range(self.field.x + 1, 8), range(self.field.y - 1, -1, -1)):  # вниз влево
+                if self.board.black_figures_list.figures_map[x, y] == 1: flag = False
+                self.available_movements[x, y] = int(flag)
+                if self.board.white_figures_list.figures_map[x, y] == 1: flag = False
+            flag = True
+            for x, y in zip(range(self.field.x - 1, -1, -1), range(self.field.y + 1, 8)):  # вверх вправо
+                if self.board.black_figures_list.figures_map[x, y] == 1: flag = False
+                self.available_movements[x, y] = int(flag)
+                if self.board.white_figures_list.figures_map[x, y] == 1: flag = False
+            flag = True
+            for x, y in zip(range(self.field.x - 1, -1, -1), range(self.field.y - 1, -1, -1)):  # вверх влево
+                if self.board.black_figures_list.figures_map[x, y] == 1: flag = False
+                self.available_movements[x, y] = int(flag)
+                if self.board.white_figures_list.figures_map[x, y] == 1: flag = False
 
 
 class King(Figure):
@@ -265,7 +442,7 @@ class King(Figure):
                                             [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                                             [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                                             [0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0],
-                                            [0, 0, 0, 0, 0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0],
+                                            [0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0],
                                             [0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0],
                                             [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                                             [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -282,3 +459,6 @@ class King(Figure):
 
     def check_movements(self):
         super().check_movements()
+        # добавить рокировки
+        # не ходить на клетки под боем
+        # спасаться ри шаха

@@ -19,14 +19,12 @@ class ChessFieldCanvas(Canvas):
 
     @Figure.setter
     def Figure(self, figure):
-        if figure is None:  # фигура уходит с этой клетки
+        if not figure:  # фигура уходит с этой клетки
             self.delete(self.find_all()[-1])
-            if self._figure.color == 'white':
-                self._figure.board.white_figures_list.figures_map[self._figure.x, self._figure.y] = 0
-            else:
-                self._figure.board.black_figures_list.figures_map[self._figure.x, self._figure.y] = 0
+            self._figure.board.white_figures_list.figures_map[self.x, self.y] = 0
+            self._figure.board.black_figures_list.figures_map[self.x, self.y] = 0
             self._figure = None
-        elif self._figure is None:  # эта клетка была пустая, пришла фигура
+        elif not self._figure:  # эта клетка была пустая, пришла фигура
             self._figure = figure
             self._figure.field = self
             if self._figure.coords_on_img : self._figure.drawself()
@@ -39,10 +37,14 @@ class ChessFieldCanvas(Canvas):
             self._figure = figure
             self._figure.field = self
             if self._figure.coords_on_img: self._figure.drawself()
-        # иначе, если на клетке не было фигуры и приходит None, то ничего не делаем
 
 
 class FiguresList(list):
-    def __init__(self):
+    def __init__(self, board):
         super(FiguresList, self).__init__()
         self.figures_map = np.zeros((8, 8), dtype=int)
+        self.board = board
+
+    def append(self, value):
+        super().append(value)
+        self.board.calculateMovements()

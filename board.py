@@ -13,8 +13,8 @@ class Gameboard:
         self.canvaslists = []  # списки клеток по рядам
         self.history = []
         self.drawboard()  # рисуем доску
-        self.white_figures_list = FiguresList()
-        self.black_figures_list = FiguresList()
+        self.white_figures_list = FiguresList(self)
+        self.black_figures_list = FiguresList(self)
         self.figures_on_start_positions()  # рисуем фигуры
         self.save_canvas_bgcolor_dict = {}  # словарь хранения клеток и их цветов
         self.clickedFigure = None  # флаг клика
@@ -62,8 +62,6 @@ class Gameboard:
         self.white_figures_list.append(Knight(self.canvaslists[7][6], 'white', self))
         self.white_figures_list.append(Rook(self.canvaslists[7][7], 'white', self))
 
-        self.calculateMovements()
-
     def click_on_figure(self, event):  # событие клика
         self.back_canvases_colors()  # возвращаем цвета назад
         if self.clickedFigure:  # если на предыдущем клике была выбрана фигура
@@ -71,7 +69,7 @@ class Gameboard:
             self.clickedFigure = None
         else:  # если предыдущий клик был по пустой клетке, или была попытка сделать ход
             self.change_canvas_color(event.widget, ('darkgray', 'darkolivegreen'))  # просто выделяем клетку
-            if event.widget.Figure is not None:  # если на клетке есть фигура, показываем возможные ходы
+            if event.widget.Figure:  # если на клетке есть фигура, показываем возможные ходы
                 self.clickedFigure = event.widget.Figure  # сохраняем фигуру для след клика
                 res = np.where(self.clickedFigure.available_movements == 1)
                 for r in zip(res[0], res[1]):  # рисуем возможные ходы выбранной фигуры

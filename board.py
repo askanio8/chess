@@ -95,9 +95,49 @@ class Gameboard:
 
     def calculateMovements(self):
         '''
-        считаем возможные ходы для фигур
+        считаем возможные ходы для фигур и проверяем есть ли шах королям
         '''
+        white_map_beats = np.zeros((8, 8))
+        black_map_beats = np.zeros((8, 8))
+        white_king = None
+        black_king = None
+        # считаем ходы всех фигур
         for figure in self.white_figures_list:
-            figure.check_movements()
+            if not isinstance(figure, King):
+                figure.check_movements()
+                if not isinstance(figure, Pawn):
+                    white_map_beats = np.logical_or(white_map_beats, figure.available_movements)
+                else:
+                    white_map_beats = np.logical_or(white_map_beats, figure.available_beats)
+            else:
+                white_king = figure
+
+        # считаем ходы всех фигур
         for figure in self.black_figures_list:
-            figure.check_movements()
+            if not isinstance(figure, King):
+                figure.check_movements()
+                if not isinstance(figure, Pawn):
+                    black_map_beats = np.logical_or(black_map_beats, figure.available_movements)
+                else:
+                    black_map_beats = np.logical_or(black_map_beats, figure.available_beats)
+            else:
+                black_king = figure
+
+        # шах королю
+        if white_king:
+            white_king.has_check = bool(black_map_beats[white_king.field.x, white_king.field.y])
+            white_king.check_movements()
+
+        # шах королю
+        if black_king:
+            black_king.has_check = bool(white_map_beats[black_king.field.x, black_king.field.y])
+            black_king.check_movements()
+
+        # оставляем только ходы, спасающие короля от шаха
+        if white_king and white_king.has_check:
+            for figure in self.white_figures_list:
+                figure.save_king_from_check()
+
+        if white_king and white_king.has_check:
+            for figure in self.white_figures_list:
+                figure.save_king_from_check()
